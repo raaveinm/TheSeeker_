@@ -1,0 +1,41 @@
+# Основные исключения для UE5
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+*.sln
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+
+# Исключения для конкретных платформ
+iOS/
+Android/
+Linux/
+Mac/
+HTML5/
+
+# Промежуточные файлы
+*.log
+*.backup
+*.tmp
+
+# Готовые сборки
+*.apk
+*.ipa
+*.exe
+*.dll
+*.so
+*.app
+
+# Автогенерируемые файлы
+*.generated.h
+*.generated.cpp
+
+# other folders
+.idea/
+.git/
+.gitignore
