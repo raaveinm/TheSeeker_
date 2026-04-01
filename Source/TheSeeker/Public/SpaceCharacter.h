@@ -57,7 +57,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	UInputAction* IA_Look;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
-	UInputAction* IA_MoveX_Backward;
+	UInputAction* IA_SwapShoulder;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UInputAction* IA_Pitch;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UInputAction* IA_RotationX;
 
 	/////////////////////////////////////////////
 	// Physics
@@ -90,14 +94,19 @@ protected:
 private:
 	// movement handling
 	void MoveX(const FInputActionValue& ia_x);
-	void MoveX_Backward(const FInputActionValue& ia_x);
 	void MoveZ(const FInputActionValue& ia_z);
 	void TurnYaw(const FInputActionValue& ia_yaw);
+	void RotationX(const FInputActionValue& ia_x);
 	void CameraRotation(const FInputActionValue& ia_look);
+	void SwapShoulder();
+	void Pitch(const FInputActionValue& ia_pitch);
 	
 	// Thruster state observer
 	bool isThrustingEnd;
 	
 	FVector currentLinearInput;
 	float currentYawInput;
+	float currentXRotationInput;
+	float currentPitchInput;
+	float shoulderPosition = 125.f;
 };

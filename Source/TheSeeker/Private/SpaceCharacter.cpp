@@ -20,12 +20,14 @@ ASpaceCharacter::ASpaceCharacter() {
 	CapsuleComponent->InitCapsuleSize(45.f, 90.f);
 	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CapsuleComponent->SetCollisionProfileName(TEXT("PhysicsActor"));
+	CapsuleComponent->SetRelativeRotation(FRotator(60.f, 0.f, 0.f));
+	SetActorRotation(FRotator(-90.f, 0.f, 0.f));
 	
 	// Mesh
 	MeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetRelativeLocation(FVector(0.f, 0.f, -90.f));
-	MeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+	MeshComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
+	MeshComponent->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 	MeshComponent->SetCollisionProfileName(TEXT("NoCollision"));
 	
 	// Camera
@@ -34,7 +36,7 @@ ASpaceCharacter::ASpaceCharacter() {
 	SpringArmComponent->TargetArmLength = ARM_LENGTH;
 	SpringArmComponent->bEnableCameraLag = true;
 	SpringArmComponent->CameraLagSpeed = LAG_SPEED;
-	SpringArmComponent->bUsePawnControlRotation = false; 
+	SpringArmComponent->SocketOffset = FVector(-25.f, shoulderPosition, 25.f);
 	
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
 	CameraComponent->SetupAttachment(SpringArmComponent);
@@ -46,8 +48,8 @@ ASpaceCharacter::ASpaceCharacter() {
 	CapsuleComponent->SetAngularDamping(3.f);
 	
 	// Defaults
-	THRUSTER_FORCE = 80000.f;
-	TORQUE_FORCE = 550000.f;
+	THRUSTER_FORCE = 90000.f;
+	TORQUE_FORCE = 750000.f;
 	isThrustingEnd = false;
 	currentLinearInput = FVector::ZeroVector;
 	currentYawInput = 0.f;
@@ -62,7 +64,8 @@ void ASpaceCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	bool isThrusting = !currentLinearInput.IsNearlyZero() || FMath::Abs(currentYawInput) > .01f;
+	bool isThrusting = !currentLinearInput.IsNearlyZero() 
+	|| FMath::Abs(currentYawInput + currentXRotationInput + currentPitchInput) > .01f;
 	
 	if (isThrusting) {
 		FVector thrustDirection = GetActorForwardVector() * currentLinearInput.X + GetActorUpVector() * currentLinearInput.Z;
@@ -71,6 +74,12 @@ void ASpaceCharacter::Tick(float DeltaTime)
 		
 		FVector torque = GetActorUpVector() * currentYawInput * TORQUE_FORCE;
 		CapsuleComponent->AddTorqueInRadians(torque);
+		
+		FVector pitchTorque = GetActorRightVector() * currentPitchInput * TORQUE_FORCE;
+		CapsuleComponent->AddTorqueInRadians(pitchTorque);
+
+		FVector rollTorque = GetActorForwardVector() * currentXRotationInput * TORQUE_FORCE;
+		CapsuleComponent->AddTorqueInRadians(rollTorque);
 	}
 	
 	if (isThrusting && !isThrustingEnd)
@@ -79,8 +88,13 @@ void ASpaceCharacter::Tick(float DeltaTime)
 		isThrustingEnd = isThrusting;
 	}
 	
+	float CurrentY = SpringArmComponent->SocketOffset.Y;
+	SpringArmComponent->SocketOffset.Y = FMath::FInterpTo(CurrentY, shoulderPosition, DeltaTime, 10.f);
+
 	currentLinearInput = FVector::ZeroVector;
 	currentYawInput = 0.f;
+	currentPitchInput = 0.f;
+	currentXRotationInput = 0.f;
 }
 
 /////////////////////////////////////////////
@@ -107,19 +121,24 @@ void ASpaceCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	UEnhancedInputComponent* IA_Component = CastChecked<UEnhancedInputComponent>(PlayerInputComponent);
 	if (!IA_Component) return;
 
-	IA_Component->BindAction(IA_MoveX_Backward, ETriggerEvent::Triggered, this, &ASpaceCharacter::MoveX_Backward);
 	IA_Component->BindAction(IA_MoveX, ETriggerEvent::Triggered, this, &ASpaceCharacter::MoveX);
 	IA_Component->BindAction(IA_MoveZ, ETriggerEvent::Triggered, this, &ASpaceCharacter::MoveZ);
 	IA_Component->BindAction(IA_TurnYaw, ETriggerEvent::Triggered, this, &ASpaceCharacter::TurnYaw);
+	IA_Component->BindAction(IA_RotationX, ETriggerEvent::Triggered, this, &ASpaceCharacter::RotationX);
+	IA_Component->BindAction(IA_Pitch, ETriggerEvent::Triggered, this, &ASpaceCharacter::Pitch);
 	if (IA_Interact) IA_Component->BindAction(IA_Interact, ETriggerEvent::Started, this, &ASpaceCharacter::InteractClicked);
 	IA_Component->BindAction(IA_Look, ETriggerEvent::Triggered, this, &ASpaceCharacter::CameraRotation);
+	IA_Component->BindAction(IA_SwapShoulder, ETriggerEvent::Started, this, &ASpaceCharacter::SwapShoulder);
 }
 
 // GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, FString::SanitizeFloat(ia_x.Get<float>()));
 void ASpaceCharacter::MoveX(const FInputActionValue& ia_x){ currentLinearInput.X += ia_x.Get<float>(); }
-void ASpaceCharacter::MoveX_Backward(const FInputActionValue& ia_x){ currentLinearInput.X -= ia_x.Get<float>(); }
 void ASpaceCharacter::MoveZ(const FInputActionValue& ia_z) { currentLinearInput.Z += ia_z.Get<float>(); }
 void ASpaceCharacter::TurnYaw(const FInputActionValue& ia_yaw) { currentYawInput += ia_yaw.Get<float>(); }
+void ASpaceCharacter::RotationX(const FInputActionValue& ia_x) { currentXRotationInput += ia_x.Get<float>(); }
+void ASpaceCharacter::Pitch(const FInputActionValue& ia_pitch){ currentPitchInput += ia_pitch.Get<float>(); }
+
+void ASpaceCharacter::SwapShoulder() { shoulderPosition *= -1.f; }
 
 void ASpaceCharacter::CameraRotation(const FInputActionValue& ia_look) {
 	FVector2D LookAxisVector = ia_look.Get<FVector2D>();
@@ -128,8 +147,8 @@ void ASpaceCharacter::CameraRotation(const FInputActionValue& ia_look) {
 }
 
 void ASpaceCharacter::InteractClicked() {
-	FVector start = CapsuleComponent->GetComponentLocation() + CapsuleComponent->GetUpVector() * 50.f;
-	FVector absolute_end = start + CapsuleComponent->GetForwardVector() * 1000.f;
+	FVector start = CameraComponent->GetComponentLocation() + CameraComponent->GetUpVector() * 10.f;
+	FVector absolute_end = start + CameraComponent->GetForwardVector() * 1000.f;
 	float scatter_amount = 50.f; 
 	
 	FVector random_offset(
@@ -152,7 +171,7 @@ void ASpaceCharacter::InteractClicked() {
 		collision_params
 	);
 	
-	DrawDebugLine(GetWorld(),start,end, hit? FColor::Blue : FColor::Red, false, 2.f, 0, 1.f);
+	DrawDebugLine(GetWorld(),start,end, hit? FColor::Blue : FColor::Red, false, .5f, 0, 1.f);
 	
 	if (hit) {
 		AActor* hit_actor = hit_result.GetActor();
