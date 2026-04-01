@@ -9,6 +9,7 @@ AMenuInteractableActor::AMenuInteractableActor() {
 	
 	// Set up listeners for collision
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
+	RootComponent = MeshComp;
 	MeshComp->OnClicked.AddDynamic(this, &AMenuInteractableActor::OnMeshClicked);
 	MeshComp->OnBeginCursorOver.AddDynamic(this, &AMenuInteractableActor::OnMeshBeginCursorOver);
 	MeshComp->OnEndCursorOver.AddDynamic(this, &AMenuInteractableActor::OnMeshEndCursorOver);
