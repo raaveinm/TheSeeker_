@@ -42,6 +42,23 @@ protected:
 	UCameraComponent* CameraComponent;
 	
 	/////////////////////////////////////////////
+	// Setup
+	/////////////////////////////////////////////
+	UPROPERTY(EditAnywhere, Category="Root Setup")
+	FRotator MeshRotator{0.f, -90.f, 0.f};
+	UPROPERTY(EditAnywhere, Category="Root Setup")
+	FVector MeshRelativeLocation{0.f, 0.f, 0.f};
+	
+	UPROPERTY(EditAnywhere, Category="Root Setup")
+	float CapsuleRadius{45.f};
+	UPROPERTY(EditAnywhere, Category="Root Setup")
+	float CapsuleHalfHeight{90.f};
+	UPROPERTY(EditAnywhere, Category="Root Setup")
+	FRotator CapsuleRelativeRotation{0.f, 0.f, 0.f};
+	
+	
+	
+	/////////////////////////////////////////////
 	// Input
 	/////////////////////////////////////////////
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input")
@@ -67,9 +84,9 @@ protected:
 	// Physics
 	/////////////////////////////////////////////
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flight Dynamics")
-	float THRUSTER_FORCE;
+	float THRUSTER_FORCE = 700000.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flight Dynamics")
-	float TORQUE_FORCE;
+	float TORQUE_FORCE = 5500000.f;
 	
 	/////////////////////////////////////////////
 	// Camera Adjustments

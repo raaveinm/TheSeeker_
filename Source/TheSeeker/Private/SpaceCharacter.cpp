@@ -16,18 +16,16 @@ ASpaceCharacter::ASpaceCharacter() {
 	
 	// Root capsule
 	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
-	RootComponent = CapsuleComponent;
-	CapsuleComponent->InitCapsuleSize(45.f, 90.f);
-	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapsuleComponent->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 	CapsuleComponent->SetCollisionProfileName(TEXT("PhysicsActor"));
-	CapsuleComponent->SetRelativeRotation(FRotator(60.f, 0.f, 0.f));
-	SetActorRotation(FRotator(-90.f, 0.f, 0.f));
+	CapsuleComponent->SetRelativeRotation(CapsuleRelativeRotation);
 	
 	// Mesh
 	MeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
-	MeshComponent->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+	MeshComponent->SetRelativeLocation(MeshRelativeLocation);
+	MeshComponent->SetRelativeRotation(MeshRotator);
 	MeshComponent->SetCollisionProfileName(TEXT("NoCollision"));
 	
 	// Camera
@@ -48,8 +46,6 @@ ASpaceCharacter::ASpaceCharacter() {
 	CapsuleComponent->SetAngularDamping(3.f);
 	
 	// Defaults
-	THRUSTER_FORCE = 90000.f;
-	TORQUE_FORCE = 750000.f;
 	isThrustingEnd = false;
 	currentLinearInput = FVector::ZeroVector;
 	currentYawInput = 0.f;
