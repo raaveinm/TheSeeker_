@@ -9,6 +9,7 @@
 AUnitCharacter::AUnitCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 	
 	bUseControllerRotationYaw = false;
 

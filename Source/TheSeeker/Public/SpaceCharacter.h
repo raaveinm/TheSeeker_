@@ -42,23 +42,6 @@ protected:
 	UCameraComponent* CameraComponent;
 	
 	/////////////////////////////////////////////
-	// Setup
-	/////////////////////////////////////////////
-	UPROPERTY(EditAnywhere, Category="Root Setup")
-	FRotator MeshRotator{0.f, -90.f, 0.f};
-	UPROPERTY(EditAnywhere, Category="Root Setup")
-	FVector MeshRelativeLocation{0.f, 0.f, 0.f};
-	
-	UPROPERTY(EditAnywhere, Category="Root Setup")
-	float CapsuleRadius{45.f};
-	UPROPERTY(EditAnywhere, Category="Root Setup")
-	float CapsuleHalfHeight{90.f};
-	UPROPERTY(EditAnywhere, Category="Root Setup")
-	FRotator CapsuleRelativeRotation{0.f, 0.f, 0.f};
-	
-	
-	
-	/////////////////////////////////////////////
 	// Input
 	/////////////////////////////////////////////
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input")
@@ -84,9 +67,9 @@ protected:
 	// Physics
 	/////////////////////////////////////////////
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flight Dynamics")
-	float THRUSTER_FORCE = 700000.f;
+	float THRUSTER_FORCE;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flight Dynamics")
-	float TORQUE_FORCE = 5500000.f;
+	float TORQUE_FORCE;
 	
 	/////////////////////////////////////////////
 	// Camera Adjustments
@@ -107,6 +90,21 @@ protected:
 	/////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Interaction")
 	void InteractClicked();
+
+	/////////////////////////////////////////////
+	// Interaction
+	/////////////////////////////////////////////
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	int32 BaseDamage = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	float InteractionDistance = 1000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	float InteractionScatter = 50.f;
+
+	static const FName TAG_DAMAGEABLE;
+	static const FName TAG_INTERACTABLE;
 	
 private:
 	// movement handling

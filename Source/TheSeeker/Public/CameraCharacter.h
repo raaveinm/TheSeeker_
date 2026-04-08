@@ -19,6 +19,8 @@ class THESEEKER_API ACameraCharacter : public ACharacter {
 public:
 	// Sets default values for this character's properties
 	ACameraCharacter();
+	
+	virtual void PossessedBy(AController* NewController) override;
 
 protected:
 	// Called when the game starts or when spawned
@@ -49,15 +51,38 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="Camera")
 	float FOV = 90.f;
 	
+	///////////////////////////////////////////////
+	/// Controlled unit linking
+	///////////////////////////////////////////////
+	UFUNCTION(BlueprintCallable, Category = "RTS Control")
+	void SetControlledUnit(AUnitCharacter* unit) { controlledUnit = unit; }
+	
+	UFUNCTION(BlueprintPure, Category = "RTS Control")
+	AUnitCharacter* GetControlledUnit() const { return controlledUnit; }
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS Control")
 	AUnitCharacter* controlledUnit;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS Control")
 	class UInputAction* CommandAction;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Trace")
+	float TraceDistanceAbove = 2000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Trace")
+	float TraceDistanceBelow = 10000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Trace")
+	float TraceFrequency = 0.1f; // Seconds between traces
+
+	static const FName TAG_RTS_CAMERA;
+
 	void Command(const FInputActionValue& val);
-	
+
+	private:
+	float LastTraceTime = 0.f;
+
+	protected:
 	///////////////////////////////////////////////
 	/// WSAD movement
 	///////////////////////////////////////////////

@@ -7,6 +7,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "LevelControl.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -14,7 +15,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "UnitCharacter.h"
-#include "LevelControl.h"
+#include "TheSeeker.h"
+
+const FName ACameraCharacter::TAG_RTS_CAMERA(TEXT("RTS_Camera"));
 
 ///////////////////////////////////////////////
 /// Default Movement
@@ -30,11 +33,10 @@ ACameraCharacter::ACameraCharacter()
 	bUseControllerRotationRoll = false;
 	
 	// character setup
-    GetCapsuleComponent()->SetCollisionProfileName(TEXT("RTS_Camera"));
+    GetCapsuleComponent()->SetCollisionProfileName(TAG_RTS_CAMERA);
 	GetCharacterMovement()->DefaultLandMovementMode = MOVE_Flying; 
 	GetCharacterMovement()->MaxFlySpeed = 1200.f; 
 	GetCharacterMovement()->BrakingDecelerationFlying = 2000.f;
-
 
     // camera setup
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -56,6 +58,25 @@ ACameraCharacter::ACameraCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
 
+void ACameraCharacter::PossessedBy(AController* NewController) {
+	Super::PossessedBy(NewController);
+	
+	APlayerController* playerController = Cast<APlayerController>(NewController);
+	
+	if (!playerController) return;
+	
+	playerController->bShowMouseCursor = true;
+	playerController->bEnableClickEvents = true;
+	playerController->bEnableMouseOverEvents = true;
+	
+	UEnhancedInputLocalPlayerSubsystem* sys = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(playerController->GetLocalPlayer());
+	if (!sys) return;
+	
+	if (DefaultMappingContext) {
+		sys->AddMappingContext(DefaultMappingContext, 0);
+	}
+}
+
 ///////////////////////////////////////////////
 /// Begin Game
 ///////////////////////////////////////////////
@@ -66,10 +87,14 @@ void ACameraCharacter::BeginPlay() {
 	LevelManager = Cast<ALevelControl>(actorManager);
 	
 	// Link Master - Slave
-	controlledUnit = Cast<AUnitCharacter>(GetOwner());
-	if (controlledUnit == nullptr) {
-		AActor* findActor = UGameplayStatics::GetActorOfClass(GetWorld(),AUnitCharacter::StaticClass());
-		controlledUnit = Cast<AUnitCharacter>(findActor);
+	if (!controlledUnit) 
+	{
+		controlledUnit = Cast<AUnitCharacter>(GetOwner());
+	}
+
+	if (!controlledUnit) 
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ACameraCharacter: No UnitCharacter assigned via Editor or Owner!"));
 	}
 
 	// Get the player controller and add input mapping context
@@ -92,17 +117,21 @@ void ACameraCharacter::BeginPlay() {
 ///////////////////////////////////////////////
 
 void ACameraCharacter::Command(const FInputActionValue& val) {
-	if (!controlledUnit) return;
+	if (!controlledUnit) {
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("No Unit Controlled!"));
+		return;
+	}
 	
 	APlayerController* playerController = Cast<APlayerController>(Controller);
 	if (!playerController) return;
 	
 	FHitResult hit;
+	// Ensure we only command movement to valid locations
 	if (playerController->GetHitResultUnderCursor(ECC_Visibility, false, hit)) {
-		DrawDebugSphere(
-			GetWorld(), hit.Location, 50.f, 12, FColor::Magenta, false, 1.f);
-		
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(controlledUnit->GetController(), hit.Location);
+		if (hit.GetActor()) {
+			DrawDebugSphere(GetWorld(), hit.Location, 50.f, 12, FColor::Magenta, false, 1.f);
+			UAIBlueprintHelperLibrary::SimpleMoveToLocation(controlledUnit->GetController(), hit.Location);
+		}
 	}
 }
 
@@ -137,31 +166,36 @@ void ACameraCharacter::Tick(const float DeltaTime) {
 	
 	if (!LevelManager) return;
 
-	FHitResult Hit;
-	FVector Start = GetActorLocation();
-	Start.Z += 2000.f;
-	FVector End = Start - FVector(0,0,10000);
-	
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
-	
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_GameTraceChannel1, Params))  {
-		
-		int32 CalculatedFloor = FMath::Clamp(
-			FMath::FloorToInt((Hit.Location.Z + 10.f) / LevelManager->FLOOR_HEIGHT), 
-			LevelManager->MIN_FLOOR, 
-			LevelManager->MAX_FLOOR
-		);
-		LevelManager->SetFloor(CalculatedFloor);
-		
-		float DesiredHeight = 100.f;
-		float TargetZ = Hit.Location.Z + DesiredHeight;
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - LastTraceTime >= TraceFrequency) {
+		LastTraceTime = CurrentTime;
 
-		if (FMath::Abs(GetActorLocation().Z - TargetZ) > 1.f) 
-		{
-			FVector NewLoc = GetActorLocation();
-			NewLoc.Z = FMath::FInterpTo(NewLoc.Z, TargetZ, DeltaTime, 10.f);
-			SetActorLocation(NewLoc);
+		FHitResult Hit;
+		FVector Start = GetActorLocation();
+		Start.Z += TraceDistanceAbove;
+		FVector End = Start - FVector(0, 0, TraceDistanceBelow);
+
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, COLLISION_FLOOR, Params)) {
+
+			int32 CalculatedFloor = FMath::Clamp(
+				FMath::FloorToInt((Hit.Location.Z + 10.f) / LevelManager->FLOOR_HEIGHT),
+				LevelManager->MIN_FLOOR,
+				LevelManager->MAX_FLOOR
+			);
+			LevelManager->SetFloor(CalculatedFloor);
+
+			float DesiredHeight = 100.f;
+			float TargetZ = Hit.Location.Z + DesiredHeight;
+
+			if (FMath::Abs(GetActorLocation().Z - TargetZ) > 1.f)
+			{
+				FVector NewLoc = GetActorLocation();
+				NewLoc.Z = FMath::FInterpTo(NewLoc.Z, TargetZ, DeltaTime, 10.f);
+				SetActorLocation(NewLoc);
+			}
 		}
 	}
 }

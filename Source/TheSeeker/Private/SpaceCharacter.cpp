@@ -10,22 +10,29 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "DamageableInterface.h"
+#include "InteractableInterface.h"
+#include "Kismet/GameplayStatics.h"
+
+const FName ASpaceCharacter::TAG_DAMAGEABLE(TEXT("Damageable"));
+const FName ASpaceCharacter::TAG_INTERACTABLE(TEXT("Interactable"));
 
 ASpaceCharacter::ASpaceCharacter() {
 	PrimaryActorTick.bCanEverTick = true;
 	
 	// Root capsule
 	CapsuleComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComponent"));
-	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	CapsuleComponent->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
+	RootComponent = CapsuleComponent;
+	CapsuleComponent->SetMobility(EComponentMobility::Movable);
+	CapsuleComponent->InitCapsuleSize(45.f, 90.f);
+	CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CapsuleComponent->SetCollisionProfileName(TEXT("PhysicsActor"));
-	CapsuleComponent->SetRelativeRotation(CapsuleRelativeRotation);
 	
 	// Mesh
 	MeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
-	MeshComponent->SetRelativeLocation(MeshRelativeLocation);
-	MeshComponent->SetRelativeRotation(MeshRotator);
+	MeshComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
+	MeshComponent->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 	MeshComponent->SetCollisionProfileName(TEXT("NoCollision"));
 	
 	// Camera
@@ -46,14 +53,21 @@ ASpaceCharacter::ASpaceCharacter() {
 	CapsuleComponent->SetAngularDamping(3.f);
 	
 	// Defaults
+	THRUSTER_FORCE = 2500.f;
+	TORQUE_FORCE = 15.f;
 	isThrustingEnd = false;
 	currentLinearInput = FVector::ZeroVector;
 	currentYawInput = 0.f;
+	currentPitchInput = 0.f;
+	currentXRotationInput = 0.f;
 }
 
 void ASpaceCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (CapsuleComponent) {
+		CapsuleComponent->WakeAllRigidBodies();
+	}
 }
 
 void ASpaceCharacter::Tick(float DeltaTime)
@@ -61,21 +75,31 @@ void ASpaceCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	bool isThrusting = !currentLinearInput.IsNearlyZero() 
-	|| FMath::Abs(currentYawInput + currentXRotationInput + currentPitchInput) > .01f;
+	|| !FMath::IsNearlyZero(currentYawInput)
+	|| !FMath::IsNearlyZero(currentXRotationInput)
+	|| !FMath::IsNearlyZero(currentPitchInput);
 	
 	if (isThrusting) {
 		FVector thrustDirection = GetActorForwardVector() * currentLinearInput.X + GetActorUpVector() * currentLinearInput.Z;
-		thrustDirection.Normalize();
-		CapsuleComponent->AddForce(thrustDirection * THRUSTER_FORCE);
+		if (!thrustDirection.IsNearlyZero()) {
+			thrustDirection.Normalize();
+			CapsuleComponent->AddForce(thrustDirection * THRUSTER_FORCE, NAME_None, true);
+		}
 		
 		FVector torque = GetActorUpVector() * currentYawInput * TORQUE_FORCE;
-		CapsuleComponent->AddTorqueInRadians(torque);
+		CapsuleComponent->AddTorqueInRadians(torque, NAME_None, true);
 		
 		FVector pitchTorque = GetActorRightVector() * currentPitchInput * TORQUE_FORCE;
-		CapsuleComponent->AddTorqueInRadians(pitchTorque);
+		CapsuleComponent->AddTorqueInRadians(pitchTorque, NAME_None, true);
 
 		FVector rollTorque = GetActorForwardVector() * currentXRotationInput * TORQUE_FORCE;
-		CapsuleComponent->AddTorqueInRadians(rollTorque);
+		CapsuleComponent->AddTorqueInRadians(rollTorque, NAME_None, true);
+
+		// Debug movement
+		if (GEngine) {
+			GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Cyan, FString::Printf(TEXT("Thrusting: %s | Force: %.2f"), *thrustDirection.ToString(), THRUSTER_FORCE));
+			GEngine->AddOnScreenDebugMessage(2, 0.1f, FColor::Yellow, FString::Printf(TEXT("Simulating: %s | Mass: %.2f"), CapsuleComponent->IsSimulatingPhysics() ? TEXT("YES") : TEXT("NO"), CapsuleComponent->GetMass()));
+		}
 	}
 	
 	if (isThrusting && !isThrustingEnd)
@@ -144,13 +168,12 @@ void ASpaceCharacter::CameraRotation(const FInputActionValue& ia_look) {
 
 void ASpaceCharacter::InteractClicked() {
 	FVector start = CameraComponent->GetComponentLocation() + CameraComponent->GetUpVector() * 10.f;
-	FVector absolute_end = start + CameraComponent->GetForwardVector() * 1000.f;
-	float scatter_amount = 50.f; 
+	FVector absolute_end = start + CameraComponent->GetForwardVector() * InteractionDistance;
 	
 	FVector random_offset(
-		FMath::RandRange(-scatter_amount, scatter_amount),
-		FMath::RandRange(-scatter_amount, scatter_amount),
-		FMath::RandRange(-scatter_amount, scatter_amount)
+		FMath::RandRange(-InteractionScatter, InteractionScatter),
+		FMath::RandRange(-InteractionScatter, InteractionScatter),
+		FMath::RandRange(-InteractionScatter, InteractionScatter)
 	);
 	
 	FVector end = absolute_end + random_offset;
@@ -176,29 +199,22 @@ void ASpaceCharacter::InteractClicked() {
 		// logging
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, FString::Printf(TEXT("Hit Actor: %s"), *hit_actor->GetName()));
 		
-		if (hit_actor->ActorHasTag(FName("Damageable"))) {
-			// logging
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Tag 'Damageable' - OK!"));
-			
-			UFunction* DamageFunction = hit_actor->FindFunction(FName("Damage"));
-			if (DamageFunction) {
-				// logging
-				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Function 'Damage' - OK! Applied 10 DMG."));
-				
-				struct { int32 DamageAmount;  } Params;
-				Params.DamageAmount = 10;
-				hit_actor->ProcessEvent(DamageFunction, &Params);
+		if (hit_actor->ActorHasTag(TAG_DAMAGEABLE) || hit_actor->Implements<UDamageableInterface>()) {
+			if (hit_actor->Implements<UDamageableInterface>()) {
+				IDamageableInterface::Execute_Damage(hit_actor, BaseDamage);
 			} else {
-				// logging
-				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("ERROR: Function 'Damage' NOT FOUND on Actor!"));
+				// Fallback to Unreal's native damage system
+				UGameplayStatics::ApplyDamage(hit_actor, (float)BaseDamage, GetController(), this, UDamageType::StaticClass());
 			}
-		} else {
-			// logging
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("No 'Damageable' Tag. Trying 'Interact' instead."));
-			
-			UFunction* InteractFunction = hit_actor->FindFunction(FName("Interact"));
-			if (InteractFunction) {
-				hit_actor->ProcessEvent(InteractFunction, nullptr);
+		} else if (hit_actor->ActorHasTag(TAG_INTERACTABLE) || hit_actor->Implements<UInteractableInterface>()) {
+			if (hit_actor->Implements<UInteractableInterface>()) {
+				IInteractableInterface::Execute_Interact(hit_actor);
+			} else {
+				// Old fallback - interfaces are preferred
+				UFunction* InteractFunction = hit_actor->FindFunction(FName("Interact"));
+				if (InteractFunction) {
+					hit_actor->ProcessEvent(InteractFunction, nullptr);
+				}
 			}
 		}
 	}

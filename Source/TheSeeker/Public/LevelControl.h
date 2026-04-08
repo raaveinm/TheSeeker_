@@ -45,8 +45,16 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="LevelControl")
 	void FloorDown();
+
+	UFUNCTION(BlueprintCallable, Category = "LevelControl")
+	void RegisterMultiFloorActor(AActor* Actor);
+
+	static const FName TAG_MULTI_FLOOR;
 	
 private:
 	void UpdateFloorVisibility() const;
+
+	UPROPERTY()
+	TArray<AActor*> MultiFloorActors;
 	
 };
