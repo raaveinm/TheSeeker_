@@ -49,7 +49,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LevelControl")
 	void RegisterMultiFloorActor(AActor* Actor);
 
+	// Static helper to find the Level Control in the world
+	UFUNCTION(BlueprintPure, Category = "LevelControl", meta = (WorldContext = "WorldContextObject"))
+	static ALevelControl* FindLevelControl(UObject* WorldContextObject);
+
+	// Static helper to apply standardized tags to an actor
+	UFUNCTION(BlueprintCallable, Category = "LevelControl")
+	static void ApplyFloorTags(AActor* Actor, int32 Floor);
+
 	static const FName TAG_MULTI_FLOOR;
+	static const FString PREFIX_FLOOR;
 	
 private:
 	void UpdateFloorVisibility() const;

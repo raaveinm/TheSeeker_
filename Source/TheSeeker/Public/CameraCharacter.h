@@ -52,7 +52,7 @@ protected:
 	float FOV = 90.f;
 	
 	///////////////////////////////////////////////
-	/// Controlled unit linking
+	// Controlled unit linking
 	///////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category = "RTS Control")
 	void SetControlledUnit(AUnitCharacter* unit) { controlledUnit = unit; }
@@ -84,7 +84,7 @@ protected:
 
 	protected:
 	///////////////////////////////////////////////
-	/// WSAD movement
+	// WSAD movement
 	///////////////////////////////////////////////
 	
 	// mapping context
@@ -111,13 +111,24 @@ protected:
 	void Zoom(const struct FInputActionValue& val);
 	
 	///////////////////////////////////////////////
-	/// Level Manager
+	// Level Manager
 	///////////////////////////////////////////////
 	
 	UPROPERTY()
 	ALevelControl* LevelManager;
 	void ChangeFloorUp(const FInputActionValue& val);
 	void ChangeFloorDown(const FInputActionValue& val);
+	
+	///////////////////////////////////////////////
+	// Interaction
+	///////////////////////////////////////////////
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+	class UInputAction* InteractAction;
+	
+	UFUNCTION(BlueprintNativeEvent, Category="Interaction")
+	void OnInteract(const FInputActionValue& val, AFloorBoard* TargetTile);
+	virtual void OnInteract_Implementation(const FInputActionValue& val, AFloorBoard* TargetTile);
 
 public:	
 	// Called every frame

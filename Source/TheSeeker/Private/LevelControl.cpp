@@ -1,12 +1,11 @@
-//
-// Created by raaveinm on 2/19/26.
-//
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "LevelControl.h"
 #include "EngineUtils.h"
 #include "TheSeeker.h"
 
 const FName ALevelControl::TAG_MULTI_FLOOR(TEXT("MultiFloor"));
+const FString ALevelControl::PREFIX_FLOOR(TEXT("Floor_"));
 
 ALevelControl::ALevelControl() {
 	PrimaryActorTick.bCanEverTick = false;
@@ -15,7 +14,7 @@ ALevelControl::ALevelControl() {
 void ALevelControl::BeginPlay() {
 	Super::BeginPlay();
 	
-	// Initial scan for multi-floor actors
+	// Initial scan for multi-floor actors in the scene
 	for (TActorIterator<AActor> it(GetWorld()); it; ++it) {
 		if (it->ActorHasTag(TAG_MULTI_FLOOR)) {
 			RegisterMultiFloorActor(*it);
@@ -25,11 +24,45 @@ void ALevelControl::BeginPlay() {
 	UpdateFloorVisibility();
 }
 
-
 void ALevelControl::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
 
+ALevelControl* ALevelControl::FindLevelControl(UObject* WorldContextObject)
+{
+	if (!WorldContextObject) return nullptr;
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!World) return nullptr;
+
+	for (TObjectIterator<ALevelControl> It; It; ++It)
+	{
+		if (It->GetWorld() == World) return *It;
+	}
+	return nullptr;
+}
+
+void ALevelControl::ApplyFloorTags(AActor* Actor, int32 Floor)
+{
+	if (!Actor) return;
+
+	// 1. Ensure the MultiFloor tag is present
+	if (!Actor->ActorHasTag(TAG_MULTI_FLOOR))
+	{
+		Actor->Tags.Add(TAG_MULTI_FLOOR);
+	}
+
+	// 2. Remove any existing floor tags to avoid conflicts
+	for (int32 i = Actor->Tags.Num() - 1; i >= 0; --i)
+	{
+		if (Actor->Tags[i].ToString().StartsWith(PREFIX_FLOOR))
+		{
+			Actor->Tags.RemoveAt(i);
+		}
+	}
+
+	// 3. Add the new correct floor tag
+	Actor->Tags.Add(FName(*FString::Printf(TEXT("%s%d"), *PREFIX_FLOOR, Floor)));
 }
 
 void ALevelControl::SetFloor(int32_t floor) {
@@ -60,8 +93,9 @@ void ALevelControl::UpdateFloorVisibility() const {
 		if (!actor) continue;
 
 		int32 itemFloor = -1;
+		// Find which floor this actor belongs to by checking its tags
 		for (int floor = 0; floor <= MAX_FLOOR; ++floor) {
-			FName tag = FName(*FString::Printf(TEXT("Floor_%d"), floor));
+			FName tag = FName(*FString::Printf(TEXT("%s%d"), *PREFIX_FLOOR, floor));
 			if (actor->ActorHasTag(tag))
 			{
 				itemFloor = floor;
@@ -70,6 +104,7 @@ void ALevelControl::UpdateFloorVisibility() const {
 		}
 
 		if (itemFloor != -1) {
+			// Actors on higher floors are hidden
 			bool bShouldHide = itemFloor > CURRENT_FLOOR;
 			
 			actor->SetActorHiddenInGame(bShouldHide);
@@ -78,6 +113,7 @@ void ALevelControl::UpdateFloorVisibility() const {
 			actor->GetComponents<UPrimitiveComponent>(Comps);
 			
 			for (UPrimitiveComponent* Comp : Comps) {
+				// Toggle collision for the ground trace channel and visibility
 				Comp->SetCollisionResponseToChannel(
 					COLLISION_FLOOR, 
 					bShouldHide ? ECR_Ignore : ECR_Block

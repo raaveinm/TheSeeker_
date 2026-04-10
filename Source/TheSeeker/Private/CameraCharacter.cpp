@@ -16,6 +16,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "UnitCharacter.h"
 #include "TheSeeker.h"
+#include "FloorBoard.h"
 
 const FName ACameraCharacter::TAG_RTS_CAMERA(TEXT("RTS_Camera"));
 
@@ -219,12 +220,27 @@ void ACameraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			enhancedInput->BindAction(FloorUpAction, ETriggerEvent::Started, this, &ACameraCharacter::ChangeFloorUp);
 		if (FloorDownAction)
 			enhancedInput->BindAction(FloorDownAction, ETriggerEvent::Started, this, &ACameraCharacter::ChangeFloorDown);
+		if (InteractAction)
+			enhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ACameraCharacter::OnInteract, static_cast<AFloorBoard*>(nullptr));
 	}
 }
 
 ///////////////////////////////////////////////
 /// Levels Control
 ///////////////////////////////////////////////
+
+void ACameraCharacter::OnInteract_Implementation(const FInputActionValue& val, AFloorBoard* TargetTile) {
+	if (TargetTile) return;
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
+
+	FHitResult Hit;
+	if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit)) {
+		AFloorBoard* FoundTile = Cast<AFloorBoard>(Hit.GetActor());
+		OnInteract(val, FoundTile);
+	}
+}
 
 void ACameraCharacter::ChangeFloorUp(const FInputActionValue& val) {
 	if (LevelManager && LevelManager->CURRENT_FLOOR < LevelManager->MAX_FLOOR) {
@@ -237,4 +253,3 @@ void ACameraCharacter::ChangeFloorDown(const FInputActionValue& val) {
 		LevelManager->FloorDown();
 	}
 }
-
