@@ -81,6 +81,7 @@ protected:
 
 	private:
 	float LastTraceTime = 0.f;
+	void InteractInput(const FInputActionValue& val);
 
 	protected:
 	///////////////////////////////////////////////

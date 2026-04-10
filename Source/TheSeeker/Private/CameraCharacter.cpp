@@ -221,7 +221,7 @@ void ACameraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		if (FloorDownAction)
 			enhancedInput->BindAction(FloorDownAction, ETriggerEvent::Started, this, &ACameraCharacter::ChangeFloorDown);
 		if (InteractAction)
-			enhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ACameraCharacter::OnInteract, static_cast<AFloorBoard*>(nullptr));
+			enhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ACameraCharacter::InteractInput);
 	}
 }
 
@@ -229,17 +229,22 @@ void ACameraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 /// Levels Control
 ///////////////////////////////////////////////
 
-void ACameraCharacter::OnInteract_Implementation(const FInputActionValue& val, AFloorBoard* TargetTile) {
-	if (TargetTile) return;
-
+void ACameraCharacter::InteractInput(const FInputActionValue& val) {
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
 
 	FHitResult Hit;
+	
 	if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit)) {
 		AFloorBoard* FoundTile = Cast<AFloorBoard>(Hit.GetActor());
 		OnInteract(val, FoundTile);
+	} else {
+		OnInteract(val, nullptr);
 	}
+}
+
+void ACameraCharacter::OnInteract_Implementation(const FInputActionValue& val, AFloorBoard* TargetTile) {
+	// Blueprints handle the logic.
 }
 
 void ACameraCharacter::ChangeFloorUp(const FInputActionValue& val) {

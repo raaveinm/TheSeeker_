@@ -2,8 +2,8 @@
 // Created by raaveinm on 4/8/26.
 //
 
-#include <ranges>
 #include "ShipGridManager.h"
+#include <ranges>
 
 // Sets default values for this component's properties
 UShipGridManager::UShipGridManager() {
