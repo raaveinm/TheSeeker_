@@ -1,9 +1,6 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "GridEntity.h"
 #include "ShipGridManager.h"
 #include "LevelControl.h"
-#include "FloorBoard.h"
 #include "Kismet/GameplayStatics.h"
 
 AGridEntity::AGridEntity()
@@ -19,6 +16,11 @@ void AGridEntity::BeginPlay()
 	// Auto-register with level control on start
 	ALevelControl* LC = ALevelControl::FindLevelControl(this);
 	if (LC) LC->RegisterMultiFloorActor(this);
+	
+	UShipGridManager* GridManager = UShipGridManager::FindGridManager(this);
+	if (GridManager) {
+		GridManager->RegisterPlacedObject(this, EntityGridState);
+	}
 }
 
 void AGridEntity::OnConstruction(const FTransform& Transform)
@@ -75,7 +77,6 @@ void AGridEntity::SetGridCoordinates(FIntVector NewCoords)
 	FVector NewLoc = FVector(GridCoordinates.X * TileSize, GridCoordinates.Y * TileSize, GridCoordinates.Z * FloorHeight);
 	SetActorLocation(NewLoc);
 
-	// Update floor tags for visibility
 	ALevelControl::ApplyFloorTags(this, GridCoordinates.Z);
 }
 
@@ -103,24 +104,18 @@ void AGridEntity::SnapToGrid()
 	GridCoordinates.Y = FMath::RoundToInt(SnappedY / TileSize);
 	GridCoordinates.Z = FMath::RoundToInt(SnappedZ / FloorHeight);
 
-	// AUTO-TAGGING SYSTEM:
-	// Update the actor tags so the LevelControl system knows which floor this entity belongs to
 	ALevelControl::ApplyFloorTags(this, GridCoordinates.Z);
 
-	// Ensure it's registered with the manager (especially important in-editor)
 	ALevelControl* LC = ALevelControl::FindLevelControl(this);
-	if (LC)
-	{
-		LC->RegisterMultiFloorActor(this);
-	}
+	if (LC) { LC->RegisterMultiFloorActor(this); }
 }
 
-TArray<AFloorBoard*> AGridEntity::GetInteractionTiles() const
+TArray<FTileData> AGridEntity::GetInteractionTileData() const
 {
-	TArray<AFloorBoard*> InteractionTiles;
+	TArray<FTileData> TileData;
 	
 	UShipGridManager* GridManager = UShipGridManager::FindGridManager(const_cast<AGridEntity*>(this));
-	if (!GridManager) return InteractionTiles;
+	if (!GridManager) return TileData;
 
 	for (int32 dy = -1; dy <= 1; ++dy)
 	{
@@ -129,15 +124,11 @@ TArray<AFloorBoard*> AGridEntity::GetInteractionTiles() const
 			if (dx == 0 && dy == 0) continue;
 
 			FIntVector NeighborCoords(GridCoordinates.X + dx, GridCoordinates.Y + dy, GridCoordinates.Z);
-			AFloorBoard* Tile = GridManager->GetTileWithCoordinates(NeighborCoords);
-			if (Tile)
-			{
-				InteractionTiles.Add(Tile);
-			}
+			TileData.Add(GridManager->GetTileDataAt(NeighborCoords));
 		}
 	}
 
-	return InteractionTiles;
+	return TileData;
 }
 
 void AGridEntity::OnInteracted_Implementation(AActor* InteractingUnit)

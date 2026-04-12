@@ -29,7 +29,9 @@ void AStaticCameraPawn::Tick(const float DeltaTime)
 	APlayerController* controller = Cast<APlayerController>(GetController());
 	if (!controller) return;
 	
-	float cursor_x, cursor_y;
+	if (!CameraFollowEnabled) return;
+	
+	float cursor_x, cursor_y;	
 	if (controller->GetMousePosition(cursor_x, cursor_y)) {
 		int32 viewport_size_x, viewport_size_y;
 		controller->GetViewportSize(viewport_size_x, viewport_size_y);

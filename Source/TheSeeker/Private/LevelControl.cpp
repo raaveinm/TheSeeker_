@@ -3,6 +3,7 @@
 #include "LevelControl.h"
 #include "EngineUtils.h"
 #include "TheSeeker.h"
+#include "Components/InstancedStaticMeshComponent.h"
 
 const FName ALevelControl::TAG_MULTI_FLOOR(TEXT("MultiFloor"));
 const FString ALevelControl::PREFIX_FLOOR(TEXT("Floor_"));
@@ -46,22 +47,16 @@ void ALevelControl::ApplyFloorTags(AActor* Actor, int32 Floor)
 {
 	if (!Actor) return;
 
-	// 1. Ensure the MultiFloor tag is present
-	if (!Actor->ActorHasTag(TAG_MULTI_FLOOR))
-	{
+	if (!Actor->ActorHasTag(TAG_MULTI_FLOOR)) {
 		Actor->Tags.Add(TAG_MULTI_FLOOR);
 	}
 
-	// 2. Remove any existing floor tags to avoid conflicts
-	for (int32 i = Actor->Tags.Num() - 1; i >= 0; --i)
-	{
-		if (Actor->Tags[i].ToString().StartsWith(PREFIX_FLOOR))
-		{
+	for (int32 i = Actor->Tags.Num() - 1; i >= 0; --i) {
+		if (Actor->Tags[i].ToString().StartsWith(PREFIX_FLOOR)) {
 			Actor->Tags.RemoveAt(i);
 		}
 	}
 
-	// 3. Add the new correct floor tag
 	Actor->Tags.Add(FName(*FString::Printf(TEXT("%s%d"), *PREFIX_FLOOR, Floor)));
 }
 
@@ -123,6 +118,29 @@ void ALevelControl::UpdateFloorVisibility() const {
 					ECC_Visibility, 
 					bShouldHide ? ECR_Ignore : ECR_Block
 				);
+			}
+		}
+
+		TArray<UInstancedStaticMeshComponent*> GridISMCs;
+		actor->GetComponents<UInstancedStaticMeshComponent>(GridISMCs);
+		for (UInstancedStaticMeshComponent* ISMC : GridISMCs) {
+			if (ISMC->ComponentHasTag(TAG_MULTI_FLOOR)) {
+				int32 compFloor = -1;
+				for (int floor = 0; floor <= MAX_FLOOR; ++floor) {
+					FName tag = FName(*FString::Printf(TEXT("%s%d"), *PREFIX_FLOOR, floor));
+					if (ISMC->ComponentHasTag(tag)) {
+						compFloor = floor;
+						break;
+					}
+				}
+
+				if (compFloor != -1) {
+					bool bHideComp = compFloor > CURRENT_FLOOR;
+
+					ISMC->SetVisibility(!bHideComp);
+					ISMC->SetCollisionResponseToChannel(COLLISION_FLOOR, bHideComp ? ECR_Ignore : ECR_Block);
+					ISMC->SetCollisionResponseToChannel(ECC_Visibility, bHideComp ? ECR_Ignore : ECR_Block);
+				}
 			}
 		}
 	}

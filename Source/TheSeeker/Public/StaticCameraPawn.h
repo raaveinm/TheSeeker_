@@ -33,6 +33,8 @@ protected:
 	float MaxPitchDeflection = 10.0f;
 	UPROPERTY(EditAnywhere, Category = "Camera Settings")
 	float InterpSpeed = 5.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Settings")
+	bool CameraFollowEnabled;
 
 private:
 	FRotator Rotation;

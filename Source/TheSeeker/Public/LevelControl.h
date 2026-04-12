@@ -25,14 +25,14 @@ public:
 	/// Floor Control System
 	/////////////////////////////////////////////
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LevelControl")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LevelControl")
 	int32 CURRENT_FLOOR = 0;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LevelControl")
-	int32 MAX_FLOOR = 1;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LevelControl")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LevelControl")
+	int32 MAX_FLOOR = 2;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LevelControl")
 	int32 MIN_FLOOR = 0;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LevelControl")
-	float FLOOR_HEIGHT = 200.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LevelControl")
+	float FLOOR_HEIGHT = 300.f;
 	
 	UFUNCTION(BlueprintCallable, Category="LevelControl")
 	void SetFloor(const int32 floor);

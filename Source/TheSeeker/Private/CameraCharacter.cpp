@@ -16,7 +16,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "UnitCharacter.h"
 #include "TheSeeker.h"
-#include "FloorBoard.h"
+#include "ShipGridManager.h"
+#include "GridEntity.h"
+#include "InteractableInterface.h"
 
 const FName ACameraCharacter::TAG_RTS_CAMERA(TEXT("RTS_Camera"));
 
@@ -178,11 +180,22 @@ void ACameraCharacter::Tick(const float DeltaTime) {
 
 		FCollisionQueryParams Params;
 		Params.AddIgnoredActor(this);
+		if (controlledUnit) {
+			Params.AddIgnoredActor(controlledUnit);
+		}
 
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, COLLISION_FLOOR, Params)) {
 
+			UShipGridManager* GridManager = UShipGridManager::FindGridManager(this);
+			float RelativeZ = Hit.Location.Z;
+
+			if (GridManager) {
+				// Translate world Hit location to local space relative to the ship grid
+				RelativeZ = GridManager->GetComponentTransform().InverseTransformPosition(Hit.Location).Z;
+			}
+
 			int32 CalculatedFloor = FMath::Clamp(
-				FMath::FloorToInt((Hit.Location.Z + 10.f) / LevelManager->FLOOR_HEIGHT),
+				FMath::FloorToInt((RelativeZ + 10.f) / LevelManager->FLOOR_HEIGHT),
 				LevelManager->MIN_FLOOR,
 				LevelManager->MAX_FLOOR
 			);
@@ -194,7 +207,7 @@ void ACameraCharacter::Tick(const float DeltaTime) {
 			if (FMath::Abs(GetActorLocation().Z - TargetZ) > 1.f)
 			{
 				FVector NewLoc = GetActorLocation();
-				NewLoc.Z = FMath::FInterpTo(NewLoc.Z, TargetZ, DeltaTime, 10.f);
+				NewLoc.Z = FMath::FInterpTo(NewLoc.Z, TargetZ, DeltaTime, HeightInterpSpeed);
 				SetActorLocation(NewLoc);
 			}
 		}
@@ -233,18 +246,48 @@ void ACameraCharacter::InteractInput(const FInputActionValue& val) {
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
 
+	UShipGridManager* GridManager = UShipGridManager::FindGridManager(this);
+	if (!GridManager) return;
+
 	FHitResult Hit;
-	
 	if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit)) {
-		AFloorBoard* FoundTile = Cast<AFloorBoard>(Hit.GetActor());
-		OnInteract(val, FoundTile);
+		FIntVector Coords = GridManager->WorldToGrid(Hit.Location);
+		OnInteract(val, Coords);
 	} else {
-		OnInteract(val, nullptr);
+		OnInteract(val, FIntVector(-1, -1, -1));
 	}
 }
 
-void ACameraCharacter::OnInteract_Implementation(const FInputActionValue& val, AFloorBoard* TargetTile) {
-	// Blueprints handle the logic.
+void ACameraCharacter::OnInteract_Implementation(const FInputActionValue& val, FIntVector TargetCoords) {
+	if (!controlledUnit) return;
+
+	UShipGridManager* GridManager = UShipGridManager::FindGridManager(this);
+	if (!GridManager) return;
+
+	FIntVector UnitCoords = GridManager->WorldToGrid(controlledUnit->GetActorLocation());
+	FTileData UnitTile = GridManager->GetTileDataAt(UnitCoords);
+
+	if (UnitTile.State != ETileState::Trigger) {
+		UE_LOG(LogTemp, Warning, TEXT("ACameraCharacter: Unit is not on a Trigger tile."));
+		return;
+	}
+
+	FTileData TargetTile = GridManager->GetTileDataAt(TargetCoords);
+	if (TargetTile.State == ETileState::Object || TargetTile.State == ETileState::Doorway) {
+		if (UnitTile.ParentObjectCoordinates.Contains(TargetCoords)) {
+			AActor* ObjectToInteract = TargetTile.OccupyingActor;
+			if (ObjectToInteract) {
+				if (ObjectToInteract->Implements<UInteractableInterface>()) {
+					IInteractableInterface::Execute_Interact(ObjectToInteract);
+				} 
+				else if (AGridEntity* GridEntity = Cast<AGridEntity>(ObjectToInteract)) {
+					GridEntity->OnInteracted(controlledUnit);
+				}
+			}
+		} else {
+			UE_LOG(LogTemp, Log, TEXT("ACameraCharacter: Clicked object is not a parent of the current trigger tile."));
+		}
+	}
 }
 
 void ACameraCharacter::ChangeFloorUp(const FInputActionValue& val) {

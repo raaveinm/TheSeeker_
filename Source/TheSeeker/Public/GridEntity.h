@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ShipGridManager.h"
 #include "GameFramework/Actor.h"
 #include "GridEntity.generated.h"
 
@@ -43,15 +44,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Grid")
 	void SnapToGrid();
 
-	// Returns all FloorBoard actors that act as triggers for this entity
+	// Returns data for all tiles that act as triggers for this entity
 	UFUNCTION(BlueprintPure, Category = "Grid")
-	TArray<class AFloorBoard*> GetInteractionTiles() const;
+	TArray<struct FTileData> GetInteractionTileData() const;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+	ETileState EntityGridState = ETileState::Object;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+	TArray<FIntVector> OccupiedOffsets = { FIntVector(0,0,0) };
 
-	/////////////////////////////////////////////
-	// Interaction Symbiote
-	/////////////////////////////////////////////
-
-	// Called when a unit interacts with this object via an adjacent trigger tile
 	UFUNCTION(BlueprintNativeEvent, Category = "Interaction")
 	void OnInteracted(AActor* InteractingUnit);
 	virtual void OnInteracted_Implementation(AActor* InteractingUnit);
