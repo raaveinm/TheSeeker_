@@ -80,6 +80,19 @@ void ALevelControl::FloorDown() {
 void ALevelControl::RegisterMultiFloorActor(AActor* Actor) {
 	if (Actor && !MultiFloorActors.Contains(Actor)) {
 		MultiFloorActors.Add(Actor);
+
+		for (const FName& Tag : Actor->Tags) {
+			FString TagStr = Tag.ToString();
+			if (TagStr.StartsWith(PREFIX_FLOOR)) {
+				int32 FloorIdx = FCString::Atoi(*TagStr.RightChop(PREFIX_FLOOR.Len()));
+				if (FloorIdx > MAX_FLOOR) {
+					MAX_FLOOR = FloorIdx;
+				}
+				break;
+			}
+		}
+
+		UpdateFloorVisibility();
 	}
 }
 
@@ -88,18 +101,15 @@ void ALevelControl::UpdateFloorVisibility() const {
 		if (!actor) continue;
 
 		int32 itemFloor = -1;
-		// Find which floor this actor belongs to by checking its tags
-		for (int floor = 0; floor <= MAX_FLOOR; ++floor) {
-			FName tag = FName(*FString::Printf(TEXT("%s%d"), *PREFIX_FLOOR, floor));
-			if (actor->ActorHasTag(tag))
-			{
-				itemFloor = floor;
+		for (const FName& Tag : actor->Tags) {
+			FString TagStr = Tag.ToString();
+			if (TagStr.StartsWith(PREFIX_FLOOR)) {
+				itemFloor = FCString::Atoi(*TagStr.RightChop(PREFIX_FLOOR.Len()));
 				break;
 			}
 		}
 
 		if (itemFloor != -1) {
-			// Actors on higher floors are hidden
 			bool bShouldHide = itemFloor > CURRENT_FLOOR;
 			
 			actor->SetActorHiddenInGame(bShouldHide);
@@ -108,7 +118,6 @@ void ALevelControl::UpdateFloorVisibility() const {
 			actor->GetComponents<UPrimitiveComponent>(Comps);
 			
 			for (UPrimitiveComponent* Comp : Comps) {
-				// Toggle collision for the ground trace channel and visibility
 				Comp->SetCollisionResponseToChannel(
 					COLLISION_FLOOR, 
 					bShouldHide ? ECR_Ignore : ECR_Block
@@ -126,10 +135,10 @@ void ALevelControl::UpdateFloorVisibility() const {
 		for (UInstancedStaticMeshComponent* ISMC : GridISMCs) {
 			if (ISMC->ComponentHasTag(TAG_MULTI_FLOOR)) {
 				int32 compFloor = -1;
-				for (int floor = 0; floor <= MAX_FLOOR; ++floor) {
-					FName tag = FName(*FString::Printf(TEXT("%s%d"), *PREFIX_FLOOR, floor));
-					if (ISMC->ComponentHasTag(tag)) {
-						compFloor = floor;
+				for (const FName& Tag : ISMC->ComponentTags) {
+					FString TagStr = Tag.ToString();
+					if (TagStr.StartsWith(PREFIX_FLOOR)) {
+						compFloor = FCString::Atoi(*TagStr.RightChop(PREFIX_FLOOR.Len()));
 						break;
 					}
 				}

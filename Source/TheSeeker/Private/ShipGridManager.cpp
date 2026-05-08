@@ -74,6 +74,7 @@ UInstancedStaticMeshComponent* UShipGridManager::GetOrCreateISMC(int32 Floor, ET
 	}
 
 	NewISMC->SetCollisionProfileName(TEXT("BlockAll"));
+	NewISMC->ComponentTags.Add(ALevelControl::TAG_MULTI_FLOOR);
 	NewISMC->ComponentTags.Add(FName(*FString::Printf(TEXT("Floor_%d"), Floor)));
 
 	StateISMCMap.Add(Key, NewISMC);
@@ -142,17 +143,6 @@ void UShipGridManager::RemoveInstanceForTile(FIntVector Coords) {
 }
 
 void UShipGridManager::BuildShip() {
-	if (AActor* Owner = GetOwner()) {
-		for (int32 i = Owner->Tags.Num() - 1; i >= 0; --i) {
-			if (Owner->Tags[i].ToString().StartsWith(ALevelControl::PREFIX_FLOOR)) {
-				Owner->Tags.RemoveAt(i);
-			}
-		}
-		if (!Owner->ActorHasTag(ALevelControl::TAG_MULTI_FLOOR)) {
-			Owner->Tags.Add(ALevelControl::TAG_MULTI_FLOOR);
-		}
-	}
-
 	ClearGrid();
 	
 	for (int32 z = 0; z < FLOORS_AMOUNT; ++z) {
@@ -168,6 +158,10 @@ void UShipGridManager::BuildShip() {
 			}
 		}
 	}
+
+	if (ALevelControl* LC = ALevelControl::FindLevelControl(this)) {
+		LC->UpdateFloorVisibility();
+	}
 }
 
 bool UShipGridManager::TryPlaceObject(FIntVector Coords, TSubclassOf<AActor> ObjectClass) {
@@ -182,6 +176,13 @@ bool UShipGridManager::TryPlaceObject(FIntVector Coords, TSubclassOf<AActor> Obj
 	
 	if (placedActor) {
 		Data->OccupyingActor = placedActor;
+
+		// Register with Level Control
+		ALevelControl::ApplyFloorTags(placedActor, Coords.Z);
+		if (ALevelControl* LC = ALevelControl::FindLevelControl(this)) {
+			LC->RegisterMultiFloorActor(placedActor);
+		}
+
 		SetTileState(Coords, ETileState::Object);
 		
 		SetupAdjacentTiles(Coords, true);
@@ -263,6 +264,12 @@ bool UShipGridManager::RegisterPlacedObject(AActor* placedObject, ETileState sta
 	if (!Data) return false;
 	
 	Data->OccupyingActor = placedObject;
+
+	ALevelControl::ApplyFloorTags(placedObject, coordinate.Z);
+	if (ALevelControl* LC = ALevelControl::FindLevelControl(this)) {
+		LC->RegisterMultiFloorActor(placedObject);
+	}
+
 	SetTileState(coordinate, state);
 
 	if (state == ETileState::Object || state == ETileState::Doorway) {
@@ -297,3 +304,4 @@ void UShipGridManager::RemoveParentObjectFromTile(FIntVector TileCoords, FIntVec
 void UShipGridManager::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
+

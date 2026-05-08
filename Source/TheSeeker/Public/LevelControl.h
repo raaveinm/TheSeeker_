@@ -60,9 +60,10 @@ public:
 	static const FName TAG_MULTI_FLOOR;
 	static const FString PREFIX_FLOOR;
 	
-private:
+	UFUNCTION(BlueprintCallable, Category = "LevelControl")
 	void UpdateFloorVisibility() const;
 
+private:
 	UPROPERTY()
 	TArray<AActor*> MultiFloorActors;
 	

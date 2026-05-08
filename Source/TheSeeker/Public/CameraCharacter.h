@@ -82,11 +82,16 @@ protected:
 
 	void Command(const FInputActionValue& val);
 
-	private:
+		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Levels Control")
+	float AutoFloorCooldown = 1.5f;
+
+private:
+	float LastManualFloorTime = -100.f;
 	float LastTraceTime = 0.f;
+	float TargetZ = 0.f;
 	void InteractInput(const FInputActionValue& val);
 
-	protected:
+protected:
 	///////////////////////////////////////////////
 	// WSAD movement
 	///////////////////////////////////////////////

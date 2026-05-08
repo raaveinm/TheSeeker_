@@ -37,6 +37,7 @@ ACameraCharacter::ACameraCharacter()
 	
 	// character setup
     GetCapsuleComponent()->SetCollisionProfileName(TAG_RTS_CAMERA);
+	GetCapsuleComponent()->SetCollisionResponseToAllChannels(ECR_Ignore);
 	GetCharacterMovement()->DefaultLandMovementMode = MOVE_Flying; 
 	GetCharacterMovement()->MaxFlySpeed = 1200.f; 
 	GetCharacterMovement()->BrakingDecelerationFlying = 2000.f;
@@ -86,12 +87,13 @@ void ACameraCharacter::PossessedBy(AController* NewController) {
 void ACameraCharacter::BeginPlay() {
 	Super::BeginPlay();
 	
+	TargetZ = GetActorLocation().Z;
+	
 	AActor* actorManager = UGameplayStatics::GetActorOfClass(GetWorld(), ALevelControl::StaticClass());
 	LevelManager = Cast<ALevelControl>(actorManager);
 	
 	// Link Master - Slave
-	if (!controlledUnit) 
-	{
+	if (!controlledUnit) {
 		controlledUnit = Cast<AUnitCharacter>(GetOwner());
 	}
 
@@ -129,7 +131,6 @@ void ACameraCharacter::Command(const FInputActionValue& val) {
 	if (!playerController) return;
 	
 	FHitResult hit;
-	// Ensure we only command movement to valid locations
 	if (playerController->GetHitResultUnderCursor(ECC_Visibility, false, hit)) {
 		if (hit.GetActor()) {
 			DrawDebugSphere(GetWorld(), hit.Location, 50.f, 12, FColor::Magenta, false, 1.f);
@@ -190,7 +191,6 @@ void ACameraCharacter::Tick(const float DeltaTime) {
 			float RelativeZ = Hit.Location.Z;
 
 			if (GridManager) {
-				// Translate world Hit location to local space relative to the ship grid
 				RelativeZ = GridManager->GetComponentTransform().InverseTransformPosition(Hit.Location).Z;
 			}
 
@@ -199,18 +199,23 @@ void ACameraCharacter::Tick(const float DeltaTime) {
 				LevelManager->MIN_FLOOR,
 				LevelManager->MAX_FLOOR
 			);
-			LevelManager->SetFloor(CalculatedFloor);
 
-			float DesiredHeight = 100.f;
-			float TargetZ = Hit.Location.Z + DesiredHeight;
+			bool bInManualCooldown = GetWorld()->GetTimeSeconds() - LastManualFloorTime <= AutoFloorCooldown;
+			if (!bInManualCooldown || CalculatedFloor == LevelManager->CURRENT_FLOOR) {
+				TargetZ = Hit.Location.Z + 100.f;
 
-			if (FMath::Abs(GetActorLocation().Z - TargetZ) > 1.f)
-			{
-				FVector NewLoc = GetActorLocation();
-				NewLoc.Z = FMath::FInterpTo(NewLoc.Z, TargetZ, DeltaTime, HeightInterpSpeed);
-				SetActorLocation(NewLoc);
+				if (!bInManualCooldown) {
+					LevelManager->SetFloor(CalculatedFloor);
+				}
 			}
 		}
+	}
+
+	if (FMath::Abs(GetActorLocation().Z - TargetZ) > 0.1f)
+	{
+		FVector NewLoc = GetActorLocation();
+		NewLoc.Z = FMath::FInterpTo(NewLoc.Z, TargetZ, DeltaTime, HeightInterpSpeed);
+		SetActorLocation(NewLoc);
 	}
 }
 
@@ -292,12 +297,18 @@ void ACameraCharacter::OnInteract_Implementation(const FInputActionValue& val, F
 
 void ACameraCharacter::ChangeFloorUp(const FInputActionValue& val) {
 	if (LevelManager && LevelManager->CURRENT_FLOOR < LevelManager->MAX_FLOOR) {
+		LastManualFloorTime = GetWorld()->GetTimeSeconds();
 		LevelManager->FloorUp();
+		
+		TargetZ = (LevelManager->CURRENT_FLOOR * LevelManager->FLOOR_HEIGHT) + 100.f;
 	}
 }
 
 void ACameraCharacter::ChangeFloorDown(const FInputActionValue& val) {
 	if (LevelManager && LevelManager->CURRENT_FLOOR > LevelManager->MIN_FLOOR) { 
+		LastManualFloorTime = GetWorld()->GetTimeSeconds();
 		LevelManager->FloorDown();
+
+		TargetZ = (LevelManager->CURRENT_FLOOR * LevelManager->FLOOR_HEIGHT) + 100.f;
 	}
 }
