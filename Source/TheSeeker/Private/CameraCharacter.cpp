@@ -50,7 +50,7 @@ ACameraCharacter::ACameraCharacter()
 	CameraBoom->SetRelativeRotation(FRotator(PITCH, 0.f, 0.f));
 	CameraBoom->bDoCollisionTest = false;
 	CameraBoom->bEnableCameraLag = true;
-	// CameraBoom->CameraLagSpeed = 3.f;
+	CameraBoom->CameraLagSpeed = 3.f;
 	
 	TopDownCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
 	TopDownCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
@@ -148,9 +148,11 @@ void ACameraCharacter::Move(const FInputActionValue& val) {
 	const FRotator yawRotation(0, rotation.Yaw, 0);
 	const FVector forwardDirection = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::X);
 	const FVector rightDirection = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::Y);
-	
-	AddMovementInput(forwardDirection, movementVector.Y);
-	AddMovementInput(rightDirection, movementVector.X);
+
+	FVector NewLocation = GetActorLocation() + 
+		(forwardDirection * movementVector.Y + rightDirection * movementVector.X)* 
+			GetCharacterMovement()->MaxFlySpeed * GetWorld()->GetDeltaSeconds();
+	SetActorLocation(NewLocation, true);
 }
 
 
